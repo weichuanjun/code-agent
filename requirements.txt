@@ -1,0 +1,5 @@
+streamlit
+pyautogen
+python-dotenv
+PyYAML
+watchdog 

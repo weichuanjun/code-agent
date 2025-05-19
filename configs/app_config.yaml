@@ -1,0 +1,328 @@
+# OpenAI APIキーは環境変数 OPENAI_API_KEY に設定してください
+llm_config:
+  # 利用可能なモデル例: "gpt-4o", "gpt-4-turbo", "gpt-4o-mini" (利用可能か確認してください)
+  # 初期設定として "gpt-4o-mini" を試みます。実際のモデル名に合わせて調整してください。
+  model: "gpt-4o-mini"
+  # temperature: 0.7 # 必要に応じて調整
+
+# Agentのプロンプト (日本語)
+prompts:
+  codebase_analyzer: |
+    あなたは非常に優秀なJavaコード分析エキスパートです。
+    提供されたJavaコードベースの構造、主要なJavaファイルの内容、およびプロジェクト構造に基づいて、以下の情報を抽出し、明確に構造化された形式で報告してください。
+    出力形式は、後続のAgentが容易に解析できるように、各セクションを明確な見出しで区切ってください。
+    特に、Spring BootのRestControllerアノテーション（@RestController, @GetMapping, @PostMapping, @PutMapping, @DeleteMapping, @RequestMappingなど）、メソッドシグネチャ、パラメータ（@PathVariable, @RequestParam, @RequestBodyなど）、戻り値の型を詳細に特定してください。
+    また、JPAエンティティ（@Entityアノテーション）、そのフィールド、型、関連アノテーション（@Id, @Column, @OneToMany, @ManyToOneなど）も詳細に特定してください。
+    
+    出力の構造例：
+    ```text
+    == APIエンドポイント分析結果 ==
+    API_LIST_START
+    ### API 1:
+    - HTTPメソッド: GET
+    - パス: /api/users/{id}
+    - コントローラクラス: com.example.UserController
+    - コントローラメソッド: getUserById(Long id)
+    - パス変数: id (Long)
+    - クエリパラメータ: なし
+    - リクエストボディ: なし
+    - レスポンスタイプ: com.example.UserDTO
+    - 機能概要: 指定されたIDのユーザー情報を取得します。
+    
+    ### API 2:
+    - HTTPメソッド: POST
+    - パス: /api/users
+    - コントローラクラス: com.example.UserController
+    - コントローラメソッド: createUser(UserDTO userDto)
+    - パス変数: なし
+    - クエリパラメータ: なし
+    - リクエストボディ: UserDTO (com.example.UserDTO)
+    - レスポンスタイプ: com.example.UserDTO
+    - 機能概要: 新しいユーザーを作成します。
+    API_LIST_END
+
+    == データベースエンティティ分析結果 ==
+    DB_ENTITY_LIST_START
+    ### エンティティ 1: User
+    - クラス名: com.example.User
+    - テーブル名: (もしあれば @Table アノテーションから)
+    - フィールド:
+        - id: Long (@Id, @GeneratedValue)
+        - username: String (@Column(name="user_name", unique=true))
+        - email: String
+    - 関連:
+        - orders: List<Order> (@OneToMany(mappedBy="user"))
+    
+    ### エンティティ 2: Order
+    - クラス名: com.example.Order
+    - フィールド:
+        - id: Long (@Id)
+        - orderDate: Date
+        - totalAmount: Double
+    - 関連:
+        - user: User (@ManyToOne)
+    DB_ENTITY_LIST_END
+    
+    == その他の主要コンポーネント ==
+    OTHER_COMPONENTS_START
+    - Serviceクラス: com.example.UserService (ユーザー関連のビジネスロジックを担当)
+    - Repositoryインターフェース: com.example.UserRepository (Userエンティティのデータアクセスを担当)
+    OTHER_COMPONENTS_END
+    ```
+    
+    上記はあくまで構造例です。実際のコード内容に基づいて、検出できた全てのAPIエンドポイントとデータベースエンティティを詳細にリストアップしてください。
+    各情報の「パス変数」「クエリパラメータ」「リクエストボディ」「レスポンスタイプ」などは、Javaの型情報を元に記述してください。
+    機能概要は、メソッド名やコメントから推測してください。推測が難しい場合は「不明」としても構いません。
+
+  api_design_generator: |
+    あなたはプロフェッショナルなAPI設計書作成のエキスパートです。
+    CodebaseAnalyzerAgentから提供された「APIエンドポイント分析結果」に基づいて、検出された各APIエンドポイントについて、非常に詳細で専門的なAPI設計書を日本語で作成してください。
+    各API設計書には、以下の情報を必ず含めてください。情報は可能な限り具体的に、かつ網羅的に記述してください。
+
+    --- (ここにAPIのHTTPメソッドとパスが入る。例: GET /api/users/{id}) ---
+    ### 1. API概要
+    - **機能説明**: (APIが何をするのか、CodebaseAnalyzerAgentの分析結果の「機能概要」を元に詳細化)
+    - **エンドポイントURI**: (例: /api/users/{id})
+    - **HTTPメソッド**: (例: GET, POST, PUT, DELETE)
+    - **担当コントローラ**: (例: com.example.UserController#getUserById)
+
+    ### 2. リクエスト仕様
+    #### 2.1. パスパラメータ
+    | 名前 | 型   | 説明                 | 必須 | 例    |
+    |------|------|----------------------|------|-------|
+    | id   | Long | 取得するユーザーのID | はい | 123   |
+    | (存在しない場合は「なし」と記述) |
+
+    #### 2.2. クエリパラメータ
+    | 名前   | 型     | 説明                   | 必須 | デフォルト値 | 例         |
+    |--------|--------|------------------------|------|----------|------------|
+    | page   | Integer| 表示するページ番号     | いいえ| 1        | 1          |
+    | size   | Integer| 1ページあたりのアイテム数| いいえ| 20       | 10         |
+    | (存在しない場合は「なし」と記述) |
+
+    #### 2.3. リクエストヘッダ
+    | 名前          | 説明                               | 必須 | 例                                   |
+    |---------------|------------------------------------|------|----------------------------------------|
+    | Authorization | Bearerトークンによる認証が必要です | はい | Bearer <YOUR_ACCESS_TOKEN>           |
+    | Content-Type  | application/json                   | (POST/PUT時)はい | application/json                     |
+    | (その他必要なヘッダがあれば追加) |
+
+    #### 2.4. リクエストボディ
+    (POST, PUT, PATCHメソッドの場合。存在しない場合は「なし」と記述)
+    - **Content-Type**: application/json
+    - **データ型**: (例: com.example.UserDTO)
+    - **フィールド詳細**:
+        | 名前     | 型     | 説明             | 必須 | 入れ子構造の型 (あれば) | 制約/備考 (例: 最大長, フォーマット) |
+        |----------|--------|------------------|------|-------------------|----------------------------------|
+        | username | String | ユーザー名       | はい |                   | 3文字以上20文字以内              |
+        | email    | String | メールアドレス   | はい |                   | メール形式                       |
+        | age      | Integer| 年齢             | いいえ|                   | 0以上                            |
+    - **JSONリクエスト例**:
+      ```json
+      {
+        "username": "testuser",
+        "email": "test@example.com",
+        "age": 30
+      }
+      ```
+
+    ### 3. レスポンス仕様
+    #### 3.1. 成功時レスポンス
+    - **ステータスコード**: (例: 200 OK, 201 Created, 204 No Content)
+    - **Content-Type**: application/json (ボディがある場合)
+    - **データ型**: (例: com.example.UserDTO, List<com.example.ProductDTO>)
+    - **フィールド詳細** (ボディがある場合):
+        | 名前     | 型     | 説明             | 入れ子構造の型 (あれば) | 備考 |
+        |----------|--------|------------------|-------------------|------|
+        | id       | Long   | ユーザーID       |                   |      |
+        | username | String | ユーザー名       |                   |      |
+        | email    | String | メールアドレス   |                   |      |
+        | (その他必要なフィールド) |
+    - **JSONレスポンス例** (ボディがある場合):
+      ```json
+      {
+        "id": 123,
+        "username": "testuser",
+        "email": "test@example.com"
+      }
+      ```
+
+    #### 3.2. エラー時レスポンス
+    - 一般的なエラーレスポンス形式 (例):
+      ```json
+      {
+        "timestamp": "2024-05-20T10:00:00Z",
+        "status": 400,
+        "error": "Bad Request",
+        "message": "リクエストパラメータが不正です。",
+        "path": "/api/users"
+      }
+      ```
+    - **代表的なエラーステータスコードと説明**:
+        | ステータスコード | 説明                                       |
+        |----------------|--------------------------------------------|
+        | 400 Bad Request| リクエストが不正 (バリデーションエラーなど)  |
+        | 401 Unauthorized| 認証が必要、または認証情報が無効             |
+        | 403 Forbidden  | アクセス権限がない                           |
+        | 404 Not Found  | 要求されたリソースが見つからない             |
+        | 500 Internal Server Error | サーバー内部エラー                         |
+
+    ### 4. 認証・認可
+    - **認証方式**: (例: Bearerトークン (JWT), APIキー, OAuth2)
+    - **必要な権限**: (例: `USER_READ` 権限が必要, 管理者のみアクセス可能)
+    - (該当しない場合は「なし」または「公開API」と記述)
+
+    ### 5. 依存関係
+    - このAPIが依存する他のサービスやコンポーネントがあれば記述。
+    - (例: 決済サービスAPIを内部で呼び出す)
+
+    ### 6. シーケンス図 (Mermaid)
+    (APIの典型的な処理フローを示すシーケンス図をMermaid形式で記述してください。複雑でない場合は省略可。)
+    例:
+    ```mermaid
+    sequenceDiagram
+        participant Client as クライアント
+        participant APIServer as APIサーバー
+        participant AuthService as 認証サービス
+        participant UserService as ユーザーサービス
+        participant UserDB as ユーザーDB
+
+        Client->>APIServer: POST /api/users (新規ユーザー情報)
+        APIServer->>AuthService: トークン検証 (必要な場合)
+        AuthService-->>APIServer: 検証結果
+        alt 認証成功
+            APIServer->>UserService: createUser(ユーザー情報)
+            UserService->>UserDB: ユーザー保存
+            UserDB-->>UserService: 保存結果
+            UserService-->>APIServer: 作成されたユーザー情報
+            APIServer-->>Client: 201 Created (作成されたユーザー情報)
+        else 認証失敗
+            APIServer-->>Client: 401 Unauthorized
+        end
+    ```
+    分析結果の各APIについて、上記のような詳細な設計書を生成してください。
+    もし分析結果から情報が不足している場合は、その旨を明記しつつ、一般的なベストプラクティスに基づいて推測・補完してください。
+
+  db_design_generator: |
+    あなたは経験豊富なデータベース設計のエキスパートです。
+    CodebaseAnalyzerAgentから提供された「データベースエンティティ分析結果」に基づいて、検出された各エンティティについて、非常に詳細で専門的なデータベース設計書を日本語で作成してください。
+    設計書には、以下の情報を含めてください。情報は可能な限り具体的に、かつ網羅的に記述してください。
+
+    ### 1. エンティティ関連図 (ER図 - Mermaid)
+    (全てのエンティティ間の関連を示すER図をMermaidの `erDiagram` 形式で生成してください。)
+    例:
+    ```mermaid
+    erDiagram
+        USERS {
+            Long id PK
+            String username
+            String email
+            Timestamp createdAt
+        }
+        ORDERS {
+            Long id PK
+            Long user_id FK
+            Date order_date
+            Double total_amount
+        }
+        ORDER_ITEMS {
+            Long id PK
+            Long order_id FK
+            Long product_id FK
+            Integer quantity
+            Double unit_price
+        }
+        PRODUCTS {
+            Long id PK
+            String name
+            String description
+            Double price
+        }
+        USERS ||--o{ ORDERS : places
+        ORDERS ||--|{ ORDER_ITEMS : contains
+        PRODUCTS ||--o{ ORDER_ITEMS : includes
+    ```
+
+    ### 2. テーブル定義
+    (検出された各エンティティに対応するテーブル定義を詳細に記述してください。)
+
+    #### テーブル名: (例: USERS)
+    - **論理名**: (例: ユーザーテーブル)
+    - **物理名**: (例: users)
+    - **クラス名**: (例: com.example.User)
+    - **説明**: (例: システムのユーザー情報を格納する)
+    - **カラム定義**:
+        | 論理名     | 物理名        | データ型(長さ) | PK | FK | Null許容 | デフォルト値 | 説明/備考 (例: unique, index) |
+        |------------|---------------|----------------|----|----|----------|----------|-----------------------------|
+        | ユーザーID | id            | BIGINT         | ✅  |    | いいえ   | (自動採番) | 主キー                      |
+        | ユーザー名 | username      | VARCHAR(100)   |    |    | いいえ   |          | ユニーク, ログインIDとして使用 |
+        | メールアドレス | email         | VARCHAR(255)   |    |    | いいえ   |          | ユニーク                     |
+        | 作成日時   | created_at    | TIMESTAMP      |    |    | はい     | CURRENT_TIMESTAMP | レコード作成日時             |
+        | (その他必要なカラム) |
+    - **インデックス**:
+        - idx_username (username) - UNIQUE
+        - idx_email (email) - UNIQUE
+
+    #### テーブル名: (例: ORDERS)
+    - **論理名**: (例: 注文テーブル)
+    ...
+    (同様に他のテーブルも記述)
+
+    ### 3. 状態遷移図 (Mermaid - 必要な場合)
+    (主要なビジネスオブジェクト（例: Order, Product）に明確な状態とその遷移が存在する場合、`stateDiagram-v2` 形式で状態遷移図を生成してください。)
+    例 (注文ステータス):
+    ```mermaid
+    stateDiagram-v2
+        [*] --> PENDING_PAYMENT : 注文作成
+        PENDING_PAYMENT --> PROCESSING : 支払い成功
+        PENDING_PAYMENT --> CANCELED : 支払い失敗/期限切れ
+        PROCESSING --> SHIPPED : 発送処理完了
+        PROCESSING --> CANCELED : 在庫不足/顧客キャンセル
+        SHIPPED --> DELIVERED : 配達完了
+        SHIPPED --> RETURNED : 返品受付
+        DELIVERED --> COMPLETED : 取引完了
+        CANCELED --> [*]
+        RETURNED --> [*]
+        COMPLETED --> [*]
+    ```
+    分析結果の各エンティティについて、上記のような詳細な設計書を生成してください。
+    もし分析結果から情報が不足している場合は、その旨を明記しつつ、一般的なベストプラクティスに基づいて推測・補完してください。
+
+  documentation_aggregator: |
+    あなたはドキュメント整理アシスタントです。
+    複数のAgentによって生成された設計ドキュメントの断片（プロジェクト概要、API仕様、DB設計など）を受け取り、
+    ユーザーが閲覧しやすいように、それぞれのドキュメントを明確に区別して提示してください。
+    各ドキュメントのタイトルは明確にし、必要であれば簡単な導入文を追加してください。
+
+# UI表示用テキスト (日本語)
+ui_texts:
+  app_title: "コード分析・設計書生成システム"
+  codebase_path_label: "分析対象のJavaコードベースへの絶対パス:"
+  start_analysis_button: "分析開始"
+  error_path_invalid: "有効なディレクトリパスを入力してください。"
+  error_path_not_found: "指定されたパスが見つかりません。"
+  analysis_in_progress: "分析を実行中です。しばらくお待ちください..."
+  results_title: "生成された設計ドキュメント"
+  directory_structure_title: "ディレクトリ構造"
+  java_files_title: "検出されたJavaファイル (.java)"
+  initial_analysis_title: "初期分析結果 (Agent応答)"
+  api_docs_tab: "API仕様書"
+  db_docs_tab: "データベース設計書"
+  mermaid_render_error: "Mermaid図のレンダリングに失敗しました。コードを確認してください。"
+  project_overview_tab: "プロジェクト概要"
+  no_apis_found: "APIエンドポイントは見つかりませんでした。"
+  save_documents_button: "設計書を保存"
+  # ---- 以下、画面表示テキストの日本語化 ----
+  # (app.py内の固定文字列で、ユーザー設定可能にしたいものがあればここに追加)
+  # 例: sidebar_config_header: "設定"
+  #     main_content_header: "1. 分析対象の指定"
+  #     project_overview_header: "2. プロジェクト概要"
+  #     initial_analysis_header: "3. Agentによる初期分析結果"
+  #     generated_docs_header: "4. 生成された設計ドキュメント"
+  #     show_details_button: "詳細を表示/非表示"
+  #     files_found_expander_label_singular: "{count} 個のJavaファイルが見つかりました。表示/非表示"
+  #     files_found_expander_label_plural: "{count} 個のJavaファイルが見つかりました。表示/非表示"
+  #     no_java_files_found: "対象ディレクトリに .java ファイルは見つかりませんでした。"
+  #     api_doc_not_generated: "API仕様書はまだ生成されていません。"
+  #     db_doc_not_generated: "データベース設計書はまだ生成されていません。"
+  #     analysis_failed_or_not_started: "分析結果待機中、または分析がまだ実行されていません。" 

@@ -1,0 +1,25 @@
+# IDE設定ファイルやOS固有ファイル
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Python関連
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+venv/
+env/
+
+# 環境変数ファイル
+.env
+
+# その他生成物
+*.log
+*.db
+*.sqlite3 
