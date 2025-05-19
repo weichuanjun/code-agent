@@ -2,4 +2,6 @@ streamlit
 pyautogen
 python-dotenv
 PyYAML
-watchdog 
+watchdog
+openai
+tiktoken 

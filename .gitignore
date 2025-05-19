@@ -22,4 +22,5 @@ env/
 # その他生成物
 *.log
 *.db
-*.sqlite3 
+*.sqlite3
+generated_design_documents_20250519_125753

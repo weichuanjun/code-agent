@@ -7,6 +7,7 @@ from dotenv import load_dotenv # .envファイル読み込みのため追加
 from typing import Dict, List, Tuple # Tupleを追加
 import re # 正規表現モジュールをインポート
 from datetime import datetime # datetimeをインポート
+from copy import deepcopy # deepcopyを追加
 
 from core.file_utils import get_project_structure_text, get_java_files, sanitize_filename, save_markdown_to_file # sanitize_filename と save_markdown_to_file を追加
 from agents.codebase_analyzer_agent import CodebaseAnalyzerAgent
@@ -227,6 +228,18 @@ def run_full_analysis_pipeline(codebase_path_str: str, java_files_list: List[Pat
         
         results["status"] = "Success"
         results["message"] = "設計書生成パイプラインが完了しました。"
+        
+        # 成功した場合、生成結果を履歴に保存
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if "history" not in st.session_state:
+            st.session_state.history = {}
+        st.session_state.history[timestamp] = {
+            "project_overview": deepcopy(st.session_state.project_overview_text),
+            "api_documents": deepcopy(st.session_state.api_documents),
+            "db_document": deepcopy(st.session_state.db_document)
+        }
+        log_to_status(f"ステップ4: 生成結果を履歴に保存しました ({timestamp})。")
+
         return results
 
     except Exception as e:
@@ -275,11 +288,9 @@ def main():
     
     codebase_path_str = st.text_input(
         codebase_path_label,
-        value=st.session_state.get("codebase_path", ""),
         placeholder="例: /Users/username/my-java-project",
-        key="codebase_path_input_main"
+        key="codebase_path"
     )
-    st.session_state.codebase_path = codebase_path_str
 
     # ボタン用の列を定義
     col_start_analysis, col_save_all_docs = st.columns(2)
@@ -292,7 +303,7 @@ def main():
         )
 
     with col_save_all_docs:
-        disable_save_all_button = not (st.session_state.get("documents_generated", False) and codebase_path_str)
+        disable_save_all_button = not (st.session_state.get("documents_generated", False) and st.session_state.get("codebase_path", ""))
         if st.button(
             f"📦 {save_all_to_project_root_button_text}", 
             key="save_all_to_project_root_button", 
@@ -390,6 +401,31 @@ def main():
     st.markdown("---")
     st.header(results_title_text)
 
+    # サイドバーで履歴を選択し、メインエリアの表示内容を切り替える
+    history = st.session_state.get("history", {})
+    if history:
+        st.sidebar.header("生成履歴")
+        # タイムスタンプを新しい順にソートして表示
+        sorted_timestamps = sorted(history.keys(), reverse=True)
+        selected_time = st.sidebar.selectbox(
+            "過去の生成結果を選択してください:",
+            options=sorted_timestamps,
+            format_func=lambda x: f"生成時刻: {x}",
+            index=0 # デフォルトで最新の履歴を選択
+        )
+
+        if selected_time:
+            # 選択された履歴の内容をセッション状態にロードし直す
+            selected_history_data = history[selected_time]
+            st.session_state.project_overview_text = selected_history_data.get("project_overview", "")
+            st.session_state.analysis_results_text = "選択された履歴には元の分析結果は含まれていません。\n「初期分析結果」タブは、最新の分析実行時にのみ表示されます。" # 履歴には元の分析結果は保持しない、というUI上の注意書き
+            st.session_state.api_documents = selected_history_data.get("api_documents", {})
+            st.session_state.db_document = selected_history_data.get("db_document", "")
+            st.session_state.documents_generated = True # 履歴が選択されたら保存ボタンを有効にするため
+            # 選択された履歴の概要をサイドバーに表示 (任意)
+            # st.sidebar.markdown("#### 選択中の履歴概要")
+            # st.sidebar.markdown(st.session_state.project_overview_text[:200] + "..." if st.session_state.project_overview_text else "概要なし")
+
     tab_titles = [
         project_overview_tab_text,
         initial_analysis_title,
@@ -468,4 +504,6 @@ if __name__ == "__main__":
         st.session_state.project_overview_text = ""
     if "documents_generated" not in st.session_state: 
         st.session_state.documents_generated = False
+    if "history" not in st.session_state:
+        st.session_state.history = {}
     main() 
